@@ -3,6 +3,10 @@ import "~/styles/globals.css";
 import type { Metadata } from "next";
 import { Exo } from "next/font/google";
 
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+config.autoAddCss = false;
+
 import { TRPCReactProvider } from "~/trpc/react";
 
 export const metadata: Metadata = {

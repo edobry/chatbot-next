@@ -4,6 +4,11 @@ import { useChat } from "@ai-sdk/react";
 import type { ToolInvocation, UIMessage } from "ai";
 import clsx from "clsx";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
+import { useAutoScroll } from "./util";
+import { forwardRef, useRef } from "react";
+
 function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
         <div className="flex flex-col gap-2">
@@ -14,9 +19,8 @@ function ToolCall({ invocation }: { invocation: ToolInvocation }) {
                 </span>{" "}
                 with {" "}
                 <span className="font-bold not-italic">
-                    {Object.entries(invocation.args).map(([key, value]) => {
-                        return `${key}: ${JSON.stringify(value)}`;
-                    }).join(", ")}
+                    {Object.entries(invocation.args).map(([key, value]) =>
+                        `${key}: ${JSON.stringify(value)}`).join(", ")}
                 </span>
             </div>
             {invocation.state !== "result" ? (
@@ -64,7 +68,7 @@ function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
     );
 }
 
-function Message({ message }: { message: UIMessage }) {
+const Message = forwardRef<HTMLDivElement, { message: UIMessage }>(({ message }, ref) => {
     const isUser = message.role === "user";
     const role = isUser ? "You" : "AI";
 
@@ -80,6 +84,7 @@ function Message({ message }: { message: UIMessage }) {
         <div
             key={message.id}
             className="flex flex-col gap-4 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-100 p-3"
+            ref={ref}
         >
             <div className={roleClass}>{role}</div>
             {message.parts.length === 1 && message.parts[0]?.type === "step-start" ? (
@@ -96,12 +101,14 @@ function Message({ message }: { message: UIMessage }) {
             )}
         </div>
     );
-}
+});
 
 function Chat() {
-    const { messages, input, handleInputChange, handleSubmit } = useChat({
+    const { messages, input, handleInputChange, handleSubmit, status, stop } = useChat({
         maxSteps: 10,
     });
+
+    const { containerRef, handleScroll, registerBottom } = useAutoScroll();
 
     return (
         <div
@@ -116,10 +123,18 @@ function Chat() {
                     id="messages"
                     className="min-h-0 flex-1 overflow-y-scroll px-3 pb-4"
                 >
-                    <div className="flex flex-col gap-4 pt-2">
-                        {messages.map((message) => (
-                            <Message key={message.id} message={message} />
+                    <div
+                        className="flex flex-col gap-4 pt-2"
+                        ref={containerRef}
+                        onScroll={handleScroll}
+                    >
+                        {messages.map((message, i) => (
+                            <Message key={message.id} message={message} ref={i === messages.length - 1 ? registerBottom : undefined} />
                         ))}
+
+                        {messages.length > 0 && (
+                            <div ref={registerBottom} />
+                        )}
                     </div>
                 </div>
                 <form
@@ -132,12 +147,23 @@ function Chat() {
                         placeholder="sup?"
                         className="w-full flex-1 rounded-md border-2 border-gray-300 p-2"
                     />
-                    <button
-                        type="submit"
-                        className="rounded-md border-2 border-gray-300 p-2"
-                    >
-                        Send
-                    </button>
+                    {status === "ready" && (
+                        <button
+                            type="submit"
+                            className="size-12 rounded-md border-2 border-gray-300 p-2"
+                        >
+                            <FontAwesomeIcon icon={faPaperPlane} />
+                        </button>
+                    )}
+                    {["submitted", "streaming"].includes(status) && (
+                        <button
+                            type="button"
+                            onClick={stop}
+                            className="size-12 rounded-md border-2 border-gray-300 p-2"
+                        >
+                            <FontAwesomeIcon icon={faStop} />
+                        </button>
+                    )}
                 </form>
             </div>
         </div>
