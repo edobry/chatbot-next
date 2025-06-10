@@ -5,9 +5,9 @@ import type { ToolInvocation, UIMessage } from "ai";
 import clsx from "clsx";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
+import { faPaperPlane, faPerson, faRobot, faStop } from "@fortawesome/free-solid-svg-icons";
 import { useAutoScroll } from "./util";
-import { forwardRef, useRef, useEffect } from "react";
+import { forwardRef } from "react";
 
 function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
@@ -70,7 +70,6 @@ function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
 
 const Message = forwardRef<HTMLDivElement, { message: UIMessage }>(({ message }, ref) => {
     const isUser = message.role === "user";
-    const role = isUser ? "You" : "AI";
 
     const roleClass = clsx(
         {
@@ -86,7 +85,13 @@ const Message = forwardRef<HTMLDivElement, { message: UIMessage }>(({ message },
             className="flex flex-col gap-4 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-100 p-3"
             ref={ref}
         >
-            <div className={roleClass}>{role}</div>
+            <div className={roleClass}>{isUser ? (<>
+                <FontAwesomeIcon icon={faPerson} />  You
+            </>) : (
+                <>
+                    <FontAwesomeIcon icon={faRobot} />  AI
+                </>
+            )}</div>
             {message.parts.length === 1 && message.parts[0]?.type === "step-start" ? (
                 <div className="italic">Thinking...</div>
             ) : (
@@ -126,41 +131,47 @@ function Chat() {
                     onScroll={handleScroll}
                 >
                     <div className="flex flex-col gap-4 pt-2">
-                        {messages.map((message, i) => (
+                        {messages.map((message) => (
                             <Message key={message.id} message={message} />
                         ))}
                     </div>
                 </div>
-                <form
-                    onSubmit={handleSubmit}
-                    className="flex flex-row gap-2 p-2"
-                >
-                    <input
-                        value={input}
-                        onChange={handleInputChange}
-                        placeholder="sup?"
-                        className="w-full flex-1 rounded-md border-2 border-gray-300 p-2"
-                    />
-                    {status === "ready" && (
-                        <button
-                            type="submit"
-                            className="size-12 rounded-md border-2 border-gray-300 p-2"
-                        >
-                            <FontAwesomeIcon icon={faPaperPlane} />
-                        </button>
-                    )}
-                    {["submitted", "streaming"].includes(status) && (
-                        <button
-                            type="button"
-                            onClick={stop}
-                            className="size-12 rounded-md border-2 border-gray-300 p-2"
-                        >
-                            <FontAwesomeIcon icon={faStop} />
-                        </button>
-                    )}
-                </form>
+                <ChatInput input={input} handleInputChange={handleInputChange} handleSubmit={handleSubmit} status={status} stop={stop} />
             </div>
         </div>
+    );
+}
+
+function ChatInput({ input, handleInputChange, handleSubmit, status, stop }: { input: string, handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void, handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void, status: string, stop: () => void }) {
+    return (
+        <form
+            onSubmit={handleSubmit}
+            className="flex flex-row gap-2 p-2"
+        >
+            <input
+                value={input}
+                onChange={handleInputChange}
+                placeholder="sup?"
+                className="w-full flex-1 rounded-md border-2 border-gray-300 p-2"
+            />
+            {status === "ready" && (
+                <button
+                    type="submit"
+                    className="size-12 rounded-md border-2 border-gray-300 p-2"
+                >
+                    <FontAwesomeIcon icon={faPaperPlane} />
+                </button>
+            )}
+            {["submitted", "streaming"].includes(status) && (
+                <button
+                    type="button"
+                    onClick={stop}
+                    className="size-12 rounded-md border-2 border-gray-300 p-2"
+                >
+                    <FontAwesomeIcon icon={faStop} />
+                </button>
+            )}
+        </form>
     );
 }
 
