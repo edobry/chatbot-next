@@ -5,6 +5,10 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  // Enable source maps for debugging
+  productionBrowserSourceMaps: false,
+  serverExternalPackages: ["ai"],
+};
 
 export default config;

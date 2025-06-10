@@ -1,53 +1,85 @@
-import Link from "next/link";
+"use client";
 
-import { LatestPost } from "~/app/_components/post";
-import { HydrateClient, api } from "~/trpc/server";
+import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
 
-export default async function Home() {
-	const hello = await api.post.hello({ text: "from tRPC" });
+const Part = (part: UIMessage["parts"][number] ) => {
+    switch (part.type) {
+        case "text":
+            return part.text;
+        case "reasoning":
+            return `Reasoning: ${part.reasoning}`;
+        default:
+            return "";
+    }
+}
 
-	void api.post.getLatest.prefetch();
+function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
+    return (
+        <div>
+            <div className="flex flex-row gap-2">
+                <span className="whitespace-pre-wrap">{part.type}</span>
+                <span className="whitespace-pre-wrap">{Part(part)}</span>
+            </div>
+        </div>
+    )
+}
 
+function Chat() {
+    const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+    return (
+        <div
+            id="chatbox"
+            className="m-auto flex h-[80vh] max-w-lg flex-col overflow-hidden rounded-md border-2 border-gray-300"
+        >
+            <h2 className="flex-shrink-0 bg-gray-200 p-3 text-center font-bold text-2xl text-gray-600">
+                Chatbot
+            </h2>
+            <div className="flex min-h-0 flex-1 flex-col p-2">
+                <div id="messages" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+                    <div className="flex flex-col gap-4">
+                        {messages.map((message) => (
+                            <div key={message.id} className="whitespace-pre-wrap">
+                                {message.role === "user" ? "You" : "AI"}:{" "}
+                                {message.parts.map((part, index) => {
+                                    return (
+                                        <MessagePart
+                                            key={`${message.id}-${index}`}
+                                            part={part}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex flex-shrink-0 flex-row gap-2 pt-2"
+                >
+                    <input
+                        value={input}
+                        onChange={handleInputChange}
+                        placeholder="sup?"
+                        className="w-full flex-1 rounded-md border-2 border-gray-300 p-2"
+                    />
+                    <button
+                        type="submit"
+                        className="rounded-md border-2 border-gray-300 p-2"
+                    >
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default function Home() {
 	return (
-		<HydrateClient>
-			<main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-				<div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-					<h1 className="font-extrabold text-5xl tracking-tight sm:text-[5rem]">
-						Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
-					</h1>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-						<Link
-							className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-							href="https://create.t3.gg/en/usage/first-steps"
-							target="_blank"
-						>
-							<h3 className="font-bold text-2xl">First Steps →</h3>
-							<div className="text-lg">
-								Just the basics - Everything you need to know to set up your
-								database and authentication.
-							</div>
-						</Link>
-						<Link
-							className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-							href="https://create.t3.gg/en/introduction"
-							target="_blank"
-						>
-							<h3 className="font-bold text-2xl">Documentation →</h3>
-							<div className="text-lg">
-								Learn more about Create T3 App, the libraries it uses, and how
-								to deploy it.
-							</div>
-						</Link>
-					</div>
-					<div className="flex flex-col items-center gap-2">
-						<p className="text-2xl text-white">
-							{hello ? hello.greeting : "Loading tRPC query..."}
-						</p>
-					</div>
-
-					<LatestPost />
-				</div>
-			</main>
-		</HydrateClient>
+		<div className="flex flex-col items-center justify-center h-screen">
+			<Chat />
+		</div>
 	);
 }
