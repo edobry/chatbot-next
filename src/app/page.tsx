@@ -5,7 +5,7 @@ import type { ToolInvocation, UIMessage } from "ai";
 import clsx from "clsx";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPaperPlane, faPerson, faRobot, faStop } from "@fortawesome/free-solid-svg-icons";
+import { faPaperPlane, faPerson, faRobot, faRotateLeft, faRotateRight, faSpinner, faStop } from "@fortawesome/free-solid-svg-icons";
 import { useAutoScroll } from "./util";
 import { forwardRef } from "react";
 
@@ -68,7 +68,7 @@ function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
     );
 }
 
-const Message = forwardRef<HTMLDivElement, { message: UIMessage }>(({ message }, ref) => {
+const Message = forwardRef<HTMLDivElement, { message: UIMessage, reload: () => void }>(({ message, reload }, ref) => {
     const isUser = message.role === "user";
 
     const roleClass = clsx(
@@ -80,36 +80,45 @@ const Message = forwardRef<HTMLDivElement, { message: UIMessage }>(({ message },
     );
 
     return (
-        <div
-            key={message.id}
-            className="flex flex-col gap-4 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-100 p-3"
-            ref={ref}
-        >
-            <div className={roleClass}>{isUser ? (<>
-                <FontAwesomeIcon icon={faPerson} />  You
-            </>) : (
-                <>
-                    <FontAwesomeIcon icon={faRobot} />  AI
-                </>
-            )}</div>
-            {message.parts.length === 1 && message.parts[0]?.type === "step-start" ? (
-                <div className="italic">Thinking...</div>
-            ) : (
-                message.parts.map((part, index) => {
-                return (
-                    <MessagePart
-                        key={`${message.id}-${index}`}
-                        part={part}
-                    />
-                    );
-                })
-            )}
+        <div>
+            <div
+                key={message.id}
+                className="flex flex-col gap-4 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-100 p-3"
+                ref={ref}
+            >
+                <div className={roleClass}>{isUser ? (<>
+                    <FontAwesomeIcon icon={faPerson} />  You
+                </>) : (
+                    <>
+                        <FontAwesomeIcon icon={faRobot} />  AI
+                    </>
+                )}</div>
+                {message.parts.length === 1 && message.parts[0]?.type === "step-start" ? (
+                    <div className="italic">Thinking...</div>
+                ) : (
+                    message.parts.map((part, index) => {
+                    return (
+                        <MessagePart
+                            key={`${message.id}-${index}`}
+                            part={part}
+                        />
+                        );
+                    })
+                )}
+            </div>
+            <div className="flex flex-row justify-end gap-2 pt-2 pr-1">
+                {!isUser && (
+                    <button type="button" onClick={() => reload()} className="text-gray-400 hover:text-gray-700">
+                        <FontAwesomeIcon icon={faRotateLeft} />
+                    </button>
+                )}
+            </div>
         </div>
     );
 });
 
 function Chat() {
-    const { messages, input, handleInputChange, handleSubmit, status, stop } = useChat({
+    const { messages, input, handleInputChange, handleSubmit, status, stop, reload } = useChat({
         maxSteps: 10,
     });
 
@@ -132,8 +141,13 @@ function Chat() {
                 >
                     <div className="flex flex-col gap-4 pt-2">
                         {messages.map((message) => (
-                            <Message key={message.id} message={message} />
+                            <Message key={message.id} message={message} reload={reload} />
                         ))}
+                        {status === "submitted" && (
+                            <div className="flex flex-row justify-center gap-2 pt-2 pr-1">
+                                <FontAwesomeIcon icon={faSpinner} spin />
+                            </div>
+                        )}
                     </div>
                 </div>
                 <ChatInput input={input} handleInputChange={handleInputChange} handleSubmit={handleSubmit} status={status} stop={stop} />
