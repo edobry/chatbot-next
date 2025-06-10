@@ -1,34 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 
-export function useAutoScroll(threshold = 16) {
+export function useAutoScroll() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const wasAtBottomRef = useRef(true);
-    const [observedEl, setObservedEl] = useState<Element | null>(null);
+    const shouldAutoScrollRef = useRef(true);
+    const lastScrollHeightRef = useRef(0);
+
+    // Check after every render if we should auto-scroll
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const currentScrollHeight = el.scrollHeight;
+        
+        // If content grew and we should auto-scroll, do it
+        if (currentScrollHeight > lastScrollHeightRef.current && shouldAutoScrollRef.current) {
+            el.scrollTop = el.scrollHeight - el.clientHeight;
+        }
+        
+        lastScrollHeightRef.current = currentScrollHeight;
+    });
 
     const handleScroll = () => {
         const el = containerRef.current;
         if (!el) return;
         
-        wasAtBottomRef.current =
-            el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+        // Check if user is at bottom (within 10px)
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 10;
+        shouldAutoScrollRef.current = isAtBottom;
     };
 
-    useEffect(() => {
-        if (!observedEl) return;
-
-        const ro = new ResizeObserver(() => {
-            if (wasAtBottomRef.current) {
-                observedEl.scrollIntoView({ block: "end", behavior: "smooth" });
-            }
-        });
-        ro.observe(observedEl);
-
-        return () => ro.disconnect();
-    }, [observedEl]);
-
-    const registerBottom = (el: Element | null) => {
-        setObservedEl(el);
-    };
-
-    return { containerRef, handleScroll, registerBottom };
+    return { containerRef, handleScroll };
 }

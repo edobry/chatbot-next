@@ -7,7 +7,7 @@ import clsx from "clsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
 import { useAutoScroll } from "./util";
-import { forwardRef, useRef } from "react";
+import { forwardRef, useRef, useEffect } from "react";
 
 function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
@@ -108,7 +108,7 @@ function Chat() {
         maxSteps: 10,
     });
 
-    const { containerRef, handleScroll, registerBottom } = useAutoScroll();
+    const { containerRef, handleScroll } = useAutoScroll();
 
     return (
         <div
@@ -122,19 +122,13 @@ function Chat() {
                 <div
                     id="messages"
                     className="min-h-0 flex-1 overflow-y-scroll px-3 pb-4"
+                    ref={containerRef}
+                    onScroll={handleScroll}
                 >
-                    <div
-                        className="flex flex-col gap-4 pt-2"
-                        ref={containerRef}
-                        onScroll={handleScroll}
-                    >
+                    <div className="flex flex-col gap-4 pt-2">
                         {messages.map((message, i) => (
-                            <Message key={message.id} message={message} ref={i === messages.length - 1 ? registerBottom : undefined} />
+                            <Message key={message.id} message={message} />
                         ))}
-
-                        {messages.length > 0 && (
-                            <div ref={registerBottom} />
-                        )}
                     </div>
                 </div>
                 <form
