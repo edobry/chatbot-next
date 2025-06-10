@@ -8,13 +8,15 @@ function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
         <div className="flex flex-col gap-2">
             <div className="italic">
-                AI invoked the{" "}
+                Called tool {" "}
                 <span className="font-bold not-italic">
                     {invocation.toolName}
                 </span>{" "}
-                tool with arguments{" "}
+                with {" "}
                 <span className="font-bold not-italic">
-                    {JSON.stringify(invocation.args)}
+                    {Object.entries(invocation.args).map(([key, value]) => {
+                        return `${key}: ${JSON.stringify(value)}`;
+                    }).join(", ")}
                 </span>
             </div>
             {invocation.state !== "result" ? (
@@ -97,7 +99,9 @@ function Message({ message }: { message: UIMessage }) {
 }
 
 function Chat() {
-    const { messages, input, handleInputChange, handleSubmit } = useChat();
+    const { messages, input, handleInputChange, handleSubmit } = useChat({
+        maxSteps: 10,
+    });
 
     return (
         <div
