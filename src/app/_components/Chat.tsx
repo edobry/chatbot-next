@@ -73,7 +73,7 @@ type ReasoningUIPart = {
     >;
 };
 function Reasoning({ details, startExpanded }: Pick<ReasoningUIPart, "details"> & { startExpanded: boolean }) {
-    const [reasoningExpanded, setReasoningExpanded] = useState(startExpanded);
+    const [reasoningExpanded, setReasoningExpanded] = useState(false);
 
     const [userExpanded, setUserExpanded] = useState(false);
 
@@ -85,8 +85,8 @@ function Reasoning({ details, startExpanded }: Pick<ReasoningUIPart, "details"> 
             <div
                 className="flex flex-row items-center w-full gap-2 mb-2 text-sm font-bold cursor-pointer"
                 onClick={() => {
-                    setReasoningExpanded(!reasoningExpanded);
                     setUserExpanded(true);
+                    setReasoningExpanded(!reasoningExpanded);
                 }}
             >
                 Reasoning
