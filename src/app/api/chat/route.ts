@@ -1,6 +1,6 @@
 import { streamText, tool, type UIMessage, createProviderRegistry, customProvider, type LanguageModelV1, type ProviderRegistryProvider, createDataStreamResponse } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai, type OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { anthropic, type AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import type { ProviderV1 } from "@ai-sdk/provider";
 
@@ -71,6 +71,17 @@ export const tools = {
     }),
 };
 
+const providerOptions = {
+    openai: {
+        reasoningEffort: "high",
+        reasoningSummary: "auto",
+        parallelToolCalls: true,
+    } satisfies OpenAIResponsesProviderOptions,
+    anthropic: {
+        thinking: { type: "enabled", budgetTokens: 12000 },
+    } satisfies AnthropicProviderOptions,
+};
+
 export async function POST(req: Request) {
     const { messages, model } = await req.json() as { messages: UIMessage[], model: Model };
 
@@ -78,6 +89,7 @@ export async function POST(req: Request) {
         execute: (dataStream) => {
             const result = streamText({
                 model: registry.languageModel(model),
+                providerOptions,
                 messages: messages.filter(m => m.content !== ""),
                 tools,
                 onFinish: () => {

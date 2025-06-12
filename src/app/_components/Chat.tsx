@@ -25,11 +25,11 @@ function ToolCall({ invocation }: { invocation: ToolInvocation }) {
         <div className="flex flex-col gap-2">
             <div className="italic">
                 Called tool{" "}
-                <span className="font-bold not-italic">
+                <span className="not-italic font-bold">
                     {invocation.toolName}
                 </span>{" "}
                 with{" "}
-                <span className="font-bold not-italic">
+                <span className="not-italic font-bold">
                     {Object.entries(invocation.args)
                         .map(
                             ([key, value]) => `${key}: ${JSON.stringify(value)}`
@@ -42,7 +42,7 @@ function ToolCall({ invocation }: { invocation: ToolInvocation }) {
             ) : (
                 <div className="italic">
                     Result:{" "}
-                    <span className="font-bold not-italic">
+                    <span className="not-italic font-bold">
                         {JSON.stringify(invocation.result)}
                     </span>
                 </div>
@@ -71,8 +71,8 @@ type ReasoningUIPart = {
 };
 function Reasoning({ details }: Pick<ReasoningUIPart, "details">) {
     return (
-        <div className="italic">
-            Reasoning:{" "}
+        <div className="p-2 italic bg-gray-200 border-2 border-gray-300 rounded-md">
+            <h4 className="mb-[10px] font-bold text-sm">Reasoning</h4>
             {details
                 .map((detail) =>
                     detail.type === "text" ? detail.text : detail.data
@@ -142,7 +142,7 @@ const Message = forwardRef<
         <div>
             <div
                 key={message.id}
-                className="flex flex-col gap-4 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-100 p-3"
+                className="flex flex-col gap-4 p-3 whitespace-pre-wrap bg-gray-100 border border-gray-200 rounded-md"
                 ref={ref}
             >
                 <div className={roleClass}>
@@ -217,13 +217,13 @@ export default function Chat() {
             id="chatbox"
             className="m-auto flex h-[80vh] min-w-xl max-w-xl flex-col overflow-hidden rounded-md border-2 border-gray-300"
         >
-            <h2 className="bg-gray-200 p-3 text-center font-bold text-2xl text-gray-600">
+            <h2 className="p-3 text-2xl font-bold text-center text-gray-600 bg-gray-200">
                 Chatbot
             </h2>
-            <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex flex-col flex-1 min-h-0">
                 <div
                     id="messages"
-                    className="min-h-0 flex-1 overflow-y-scroll px-3 pb-4"
+                    className="flex-1 min-h-0 px-3 pb-4 overflow-y-scroll"
                     ref={containerRef}
                     onScroll={handleScroll}
                 >
@@ -282,11 +282,11 @@ function ChatInput({
                 value={input}
                 onChange={handleInputChange}
                 placeholder="sup?"
-                className="w-full flex-1 rounded-md border-2 border-gray-300 p-2"
+                className="flex-1 w-full p-2 border-2 border-gray-300 rounded-md"
             />
             <div className="flex flex-row items-end justify-end gap-2">
                 <select
-                    className="h-full rounded-md border-2 border-gray-300 p-2"
+                    className="h-full p-2 border-2 border-gray-300 rounded-md"
                     value={model}
                     onChange={(e) => setModel(e.target.value as Model)}
                 >
@@ -303,7 +303,7 @@ function ChatInput({
                 {status === "ready" && (
                     <button
                         type="submit"
-                        className="size-12 rounded-md border-2 border-gray-300 p-2"
+                        className="p-2 border-2 border-gray-300 rounded-md size-12"
                     >
                         <FontAwesomeIcon icon={faPaperPlane} />
                     </button>
@@ -312,7 +312,7 @@ function ChatInput({
                     <button
                         type="button"
                         onClick={stop}
-                        className="size-12 rounded-md border-2 border-gray-300 p-2"
+                        className="p-2 border-2 border-gray-300 rounded-md size-12"
                     >
                         <FontAwesomeIcon icon={faStop} />
                     </button>
