@@ -3,6 +3,52 @@ import { modelDefs, tools, type Model, type Provider } from "./models";
 
 export const maxDuration = 30;
 
+// Helper function to check if an annotation has a model property
+function hasModelProperty(annotation: unknown): annotation is { model: string } {
+    return (
+        annotation !== null &&
+        typeof annotation === 'object' &&
+        'model' in annotation &&
+        typeof (annotation as { model: unknown }).model === 'string'
+    );
+}
+
+// Helper function to filter incompatible reasoning parts from messages
+function filterIncompatibleReasoning(messages: UIMessage[], targetProvider: Provider): UIMessage[] {
+    return messages.map(message => {
+        if (message.role === "user") {
+            // User messages don't have reasoning parts, return as-is
+            return message;
+        }
+
+        // For assistant messages, filter out reasoning parts from different providers
+        const filteredParts = message.parts.filter(part => {
+            if (part.type === "reasoning") {
+                // Get the model annotation from the message to determine the original provider
+                const annotations = message.annotations || [];
+                const modelAnnotation = annotations.find(hasModelProperty);
+                
+                if (modelAnnotation) {
+                    const originalProvider = modelAnnotation.model.split(':')[0] as Provider;
+                    // Only keep reasoning parts from the same provider
+                    return originalProvider === targetProvider;
+                }
+                
+                // If we can't determine the original provider, err on the side of caution and remove the reasoning
+                return false;
+            }
+            
+            // Keep all non-reasoning parts (text, tool-invocation, etc.)
+            return true;
+        });
+
+        return {
+            ...message,
+            parts: filteredParts
+        };
+    });
+}
+
 export async function POST(req: Request) {
     const { messages, model } = await req.json() as { messages: UIMessage[], model: Model };
 
@@ -21,6 +67,9 @@ export async function POST(req: Request) {
           }
         : {};
 
+    // Filter out incompatible reasoning parts to prevent schema validation errors
+    const filteredMessages = filterIncompatibleReasoning(messages, provider);
+
     return createDataStreamResponse({
         execute: (dataStream) => {
             dataStream.writeMessageAnnotation({
@@ -30,7 +79,7 @@ export async function POST(req: Request) {
             const result = streamText({
                 model: languageModel,
                 providerOptions,
-                messages,
+                messages: filteredMessages,
                 tools,
                 onFinish: (result) => {
                     console.log("Stream finished with result:", {
