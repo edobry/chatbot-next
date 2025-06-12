@@ -20,6 +20,7 @@ import { forwardRef, useState } from "react";
 
 import { api } from "~/trpc/react";
 import type { Model, ModelDefs } from "../api/chat/models";
+import { modelDefs } from "../api/chat/models";
 
 function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
@@ -314,11 +315,16 @@ function ChatInput({
                 >
                     {Object.entries(models).map(([provider, modelMap]) => (
                         <optgroup key={provider} label={provider}>
-                            {Object.entries(modelMap).map(([modelClass, name]) => (
-                                <option key={modelClass} value={`${provider}:${modelClass}`}>
-                                    {provider}: {modelClass}
-                                </option>
-                            ))}
+                            {Object.entries(modelMap).map(([modelClass, name]) => {
+                                const providerDef = modelDefs[provider as keyof typeof modelDefs];
+                                const modelDef = providerDef?.models[modelClass as keyof typeof providerDef.models];
+                                const hasReasoning = modelDef?.reasoning;
+                                return (
+                                    <option key={modelClass} value={`${provider}:${modelClass}`}>
+                                        {provider}: {modelClass}{hasReasoning && " 🧠"}
+                                    </option>
+                                );
+                            })}
                         </optgroup>
                     ))}
                 </select>
