@@ -74,16 +74,17 @@ function Reasoning({ details }: Pick<ReasoningUIPart, "details">) {
     const [reasoningExpanded, setReasoningExpanded] = useState(false);
     return (
         <div className="p-2 italic bg-gray-200 border-2 border-gray-300 rounded-md">
-            <div className="flex flex-row w-full gap-3 mb-2">
+            <div className="flex flex-row items-center w-full gap-2 mb-2">
                 <div className="text-sm font-bold">Reasoning</div>
                 <button
                     type="button"
+                    className="inline-flex"
                     onClick={() => setReasoningExpanded(!reasoningExpanded)}
                 >
                     {reasoningExpanded ? (
-                        <FontAwesomeIcon icon={faChevronRight} />
-                    ) : (
                         <FontAwesomeIcon icon={faChevronDown} />
+                    ) : (
+                        <FontAwesomeIcon icon={faChevronRight} />
                     )}
                 </button>
             </div>
