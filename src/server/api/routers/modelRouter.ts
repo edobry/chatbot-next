@@ -1,8 +1,8 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { providers } from "~/app/api/chat/route";
+import { generateProviders } from "~/app/api/chat/models";
 
 export const modelRouter = createTRPCRouter({
     list: publicProcedure.query(async ({ ctx }) => {
-        return providers;
+        return generateProviders();
     }),
 });

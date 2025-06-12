@@ -10,15 +10,16 @@ import {
     faPerson,
     faRobot,
     faRotateLeft,
-    faRotateRight,
     faSpinner,
     faStop,
-} from "@fortawesome/free-solid-svg-icons";
+    faChevronDown,
+    faChevronRight,
+    } from "@fortawesome/free-solid-svg-icons";
 import { useAutoScroll } from "~/app/util";
 import { forwardRef, useState } from "react";
 
 import { api } from "~/trpc/react";
-import type { Model, ModelDefs } from "../api/chat/route";
+import type { Model, ModelDefs } from "../api/chat/models";
 
 function ToolCall({ invocation }: { invocation: ToolInvocation }) {
     return (
@@ -70,14 +71,31 @@ type ReasoningUIPart = {
     >;
 };
 function Reasoning({ details }: Pick<ReasoningUIPart, "details">) {
+    const [reasoningExpanded, setReasoningExpanded] = useState(false);
     return (
         <div className="p-2 italic bg-gray-200 border-2 border-gray-300 rounded-md">
-            <h4 className="mb-[10px] font-bold text-sm">Reasoning</h4>
-            {details
-                .map((detail) =>
-                    detail.type === "text" ? detail.text : detail.data
-                )
-                .join("\n")}
+            <div className="flex flex-row w-full gap-3 mb-2">
+                <div className="text-sm font-bold">Reasoning</div>
+                <button
+                    type="button"
+                    onClick={() => setReasoningExpanded(!reasoningExpanded)}
+                >
+                    {reasoningExpanded ? (
+                        <FontAwesomeIcon icon={faChevronRight} />
+                    ) : (
+                        <FontAwesomeIcon icon={faChevronDown} />
+                    )}
+                </button>
+            </div>
+            {reasoningExpanded && (
+                <div className="p-2">
+                    {details
+                        .map((detail) =>
+                            detail.type === "text" ? detail.text : detail.data
+                        )
+                        .join("\n")}
+                </div>
+            )}
         </div>
     );
 }
@@ -152,7 +170,10 @@ const Message = forwardRef<
                         </>
                     ) : (
                         <>
-                            <FontAwesomeIcon icon={faRobot} /> AI {model && `(${model})`}
+                            <FontAwesomeIcon icon={faRobot} /> AI {model && (<div className="float-right rounded-md border-1 border-gray-300 bg-gray-200 p-[5px] text-gray-500 text-xs">
+                                {message.parts.some(part => part.type === "reasoning") && ("🧠 ")}
+                                {model}
+                            </div>)}
                         </>
                     )}
                 </div>
