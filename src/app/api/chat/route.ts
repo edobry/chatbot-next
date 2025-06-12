@@ -1,5 +1,5 @@
 import { streamText, type UIMessage, createDataStreamResponse, type LanguageModelV1 } from "ai";
-import { modelDefs, registry, tools, getProviderOptions, type Model, type Provider } from "./models";
+import { modelDefs, tools, type Model, type Provider } from "./models";
 
 export const maxDuration = 30;
 
@@ -11,31 +11,26 @@ export async function POST(req: Request) {
     const modelConfig = providerConfig.models[modelClass];
     const modelName = modelConfig.name;
 
-    // Get the appropriate language model based on whether it needs reasoning
-    let languageModel: LanguageModelV1;
-    if (provider === 'openai' && modelConfig.reasoning) {
-        // Use responses API for reasoning models
-        languageModel = (providerConfig.constructor as typeof import("@ai-sdk/openai").openai).responses(modelName);
-    } else {
-        // Use standard registry lookup
-        languageModel = registry.languageModel(`${provider}:${modelName}`);
-    }
+    const factory = modelConfig.factory || providerConfig.factory;
 
-    // Get provider options only if the model has reasoning enabled
-    const providerOptions = getProviderOptions(model);
+    const languageModel: LanguageModelV1 = factory(modelName);
 
-    // Debug logging
-    console.log('Looking up model:', model);
-    console.log('Model name:', modelName);
-    console.log('Found language model:', languageModel);
-    console.log('Model has doStream:', typeof languageModel?.doStream);
+    const providerOptions = modelConfig.reasoning
+        ? {
+              [provider]: providerConfig.reasoningOptions,
+          }
+        : {};
 
     return createDataStreamResponse({
         execute: (dataStream) => {
+            dataStream.writeMessageAnnotation({
+                model: model,
+            });
+
             const result = streamText({
                 model: languageModel,
                 providerOptions,
-                messages: messages.filter(m => m.content !== ""),
+                messages,
                 tools,
                 onFinish: (result) => {
                     console.log("Stream finished with result:", {
@@ -43,10 +38,6 @@ export async function POST(req: Request) {
                         hasReasoning: !!result.reasoning,
                         reasoningLength: result.reasoning?.length || 0,
                         finishReason: result.finishReason,
-                    });
-                    
-                    dataStream.writeMessageAnnotation({
-                        model: model,
                     });
                 },
             });

@@ -1,6 +1,6 @@
 import { createProviderRegistry, type LanguageModelV1, tool } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai, type OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { anthropic, type AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
 type ModelClass = "default" | "smart";
@@ -17,12 +17,27 @@ export const MODEL_NAMES = {
     },
 } as const;
 
-export const modelDefs = {
+type ModelFactory = (name: string) => LanguageModelV1;
+
+type ProviderDef = {
+    factory: ModelFactory;
+    reasoningOptions: Pick<OpenAIResponsesProviderOptions, "reasoningEffort" | "reasoningSummary" | "parallelToolCalls"> | Pick<AnthropicProviderOptions, "thinking">;
+    models: Record<ModelClass, ModelDef>;
+};
+
+export type ModelDef = {
+    name: string;
+    reasoning: boolean;
+    factory?: ModelFactory;
+}
+
+export type Provider = "openai" | "anthropic";
+export const modelDefs: Record<Provider, ProviderDef> = {
     openai: {
-        constructor: openai,
+        factory: openai,
         reasoningOptions: {
-            reasoningEffort: "high" as const,
-            reasoningSummary: "detailed" as const,
+            reasoningEffort: "high",
+            reasoningSummary: "detailed",
             parallelToolCalls: true,
         },
         models: {
@@ -33,14 +48,14 @@ export const modelDefs = {
             smart: {
                 name: MODEL_NAMES.OPENAI.O3,
                 reasoning: true,
-                constructor: openai.responses,
+                factory: openai.responses,
             },
-        }
+        },
     },
     anthropic: {
-        constructor: anthropic,
+        factory: anthropic,
         reasoningOptions: {
-            thinking: { type: "enabled" as const, budgetTokens: 12000 },
+            thinking: { type: "enabled", budgetTokens: 12000 },
         },
         models: {
             default: {
@@ -51,11 +66,10 @@ export const modelDefs = {
                 name: MODEL_NAMES.ANTHROPIC.CLAUDE_3_7_SONNET,
                 reasoning: true,
             },
-        }
-    }
+        },
+    },
 } as const;
 
-export type Provider = keyof typeof modelDefs;
 export type Model = `${Provider}:${ModelClass}`;
 export type ModelDefs = Record<Provider, Record<ModelClass, string>>;
 
@@ -80,22 +94,6 @@ export const generateProviders = (): ModelDefs => {
     }
     
     return providers;
-};
-
-// Helper function to get provider options for a specific model
-export const getProviderOptions = (model: Model) => {
-    const [provider, modelClass] = model.split(':') as [Provider, ModelClass];
-    const providerConfig = modelDefs[provider];
-    const modelConfig = providerConfig.models[modelClass];
-    
-    // Only return reasoning options if the model has reasoning enabled
-    if (modelConfig.reasoning) {
-        return {
-            [provider]: providerConfig.reasoningOptions,
-        };
-    }
-    
-    return undefined;
 };
 
 export const tools = {

@@ -14,6 +14,7 @@ import {
     faStop,
     faChevronDown,
     faChevronRight,
+    faHourglass,
     } from "@fortawesome/free-solid-svg-icons";
 import { useAutoScroll } from "~/app/util";
 import { forwardRef, useState } from "react";
@@ -71,25 +72,31 @@ type ReasoningUIPart = {
           }
     >;
 };
-function Reasoning({ details }: Pick<ReasoningUIPart, "details">) {
-    const [reasoningExpanded, setReasoningExpanded] = useState(false);
+function Reasoning({ details, startExpanded }: Pick<ReasoningUIPart, "details"> & { startExpanded: boolean }) {
+    const [reasoningExpanded, setReasoningExpanded] = useState(startExpanded);
+
+    const [userExpanded, setUserExpanded] = useState(false);
+
+    const shouldBeExpanded = userExpanded ? reasoningExpanded : startExpanded;
+
     return (
         <div className="p-2 italic bg-gray-200 border-2 border-gray-300 rounded-md">
-            <div className="flex flex-row items-center w-full gap-2 mb-2">
-                <div className="text-sm font-bold">Reasoning</div>
-                <button
-                    type="button"
-                    className="inline-flex"
-                    onClick={() => setReasoningExpanded(!reasoningExpanded)}
-                >
-                    {reasoningExpanded ? (
-                        <FontAwesomeIcon icon={faChevronDown} />
-                    ) : (
-                        <FontAwesomeIcon icon={faChevronRight} />
-                    )}
-                </button>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
+            <div
+                className="flex flex-row items-center w-full gap-2 mb-2 text-sm font-bold cursor-pointer"
+                onClick={() => {
+                    setReasoningExpanded(!reasoningExpanded);
+                    setUserExpanded(true);
+                }}
+            >
+                Reasoning
+                {shouldBeExpanded ? (
+                    <FontAwesomeIcon icon={faChevronDown} />
+                ) : (
+                    <FontAwesomeIcon icon={faChevronRight} />
+                )}
             </div>
-            {reasoningExpanded && (
+            {shouldBeExpanded && (
                 <div className="p-2">
                     {details
                         .map((detail) =>
@@ -102,7 +109,7 @@ function Reasoning({ details }: Pick<ReasoningUIPart, "details">) {
     );
 }
 
-function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
+function MessagePart({ part, numParts }: { part: UIMessage["parts"][number], numParts: number }) {
     if (part.type === "step-start") {
         return;
     }
@@ -122,7 +129,7 @@ function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
                     case "tool-invocation":
                         return <ToolCall invocation={part.toolInvocation} />;
                     case "reasoning":
-                        return <Reasoning details={part.details} />;
+                        return <Reasoning startExpanded={numParts <= 2} details={part.details} />;
                     default:
                         return JSON.stringify(part);
                 }
@@ -172,22 +179,32 @@ const Message = forwardRef<
                         </>
                     ) : (
                         <>
-                            <FontAwesomeIcon icon={faRobot} /> AI {model && (<div className="float-right rounded-md border-1 border-gray-300 bg-gray-200 p-[5px] text-gray-500 text-xs">
-                                {message.parts.some(part => part.type === "reasoning") && ("🧠 ")}
-                                {model}
-                            </div>)}
+                            <FontAwesomeIcon icon={faRobot} /> AI{" "}
+                            {model && (
+                                <div className="float-right rounded-md border-1 border-gray-300 bg-gray-200 p-[5px] text-gray-500 text-xs">
+                                    {message.parts.some(
+                                        (part) => part.type === "reasoning"
+                                    ) && "🧠 "}
+                                    {model}
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
-                {message.parts.length === 1 &&
-                message.parts[0]?.type === "step-start" ? (
-                    <div className="italic">Thinking...</div>
+                {message.parts.length === 0 ||
+                (message.parts.length === 1 &&
+                    message.parts[0]?.type === "step-start") ? (
+                    <div className="flex flex-row items-center gap-3 italic">
+                        Thinking...
+                        <FontAwesomeIcon icon={faSpinner} spin />
+                    </div>
                 ) : (
                     message.parts.map((part, index) => {
                         return (
                             <MessagePart
                                 key={`${message.id}-${index}`}
                                 part={part}
+                                numParts={message.parts.length}
                             />
                         );
                     })
@@ -328,15 +345,14 @@ function ChatInput({
                         </optgroup>
                     ))}
                 </select>
-                {status === "ready" && (
+                {status === "ready" ? (
                     <button
                         type="submit"
                         className="p-2 border-2 border-gray-300 rounded-md size-12"
                     >
                         <FontAwesomeIcon icon={faPaperPlane} />
                     </button>
-                )}
-                {["submitted", "streaming"].includes(status) && (
+                ) : (["submitted", "streaming"].includes(status) ? (
                     <button
                         type="button"
                         onClick={stop}
@@ -344,7 +360,14 @@ function ChatInput({
                     >
                         <FontAwesomeIcon icon={faStop} />
                     </button>
-                )}
+                ) : (
+                    <button
+                        type="button"
+                        className="p-2 border-2 border-gray-300 rounded-md size-12"
+                    >
+                        <FontAwesomeIcon icon={faHourglass} spin />
+                    </button>
+                ))}
             </div>
         </form>
     );
