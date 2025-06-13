@@ -253,21 +253,18 @@ export default function Chat() {
     const { containerRef, handleScroll } = useAutoScroll();
 
     return (
-        <div
-            id="chatbox"
-            className="m-auto flex h-[80vh] min-w-xl max-w-xl flex-col overflow-hidden rounded-md border-2 border-gray-300"
-        >
+        <div id="chatbox" className="flex flex-col w-full h-full m-auto">
             <h2 className="p-3 text-2xl font-bold text-center text-gray-600 bg-gray-200">
                 Chatbot
             </h2>
-            <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-col flex-1 w-full min-h-0">
                 <div
                     id="messages"
-                    className="flex-1 min-h-0 px-3 pb-4 overflow-y-scroll"
+                    className="flex-1 min-h-0 py-4 overflow-y-auto"
                     ref={containerRef}
                     onScroll={handleScroll}
                 >
-                    <div className="flex flex-col gap-4 pt-2">
+                    <div className="flex flex-col gap-4 pt-2 m-auto max-w-1/2 min-w-1/4">
                         {messages.map((message) => (
                             <Message
                                 key={message.id}
@@ -317,7 +314,7 @@ function ChatInput({
     stop: () => void;
 }) {
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-shrink-0 gap-2 p-2">
             <input
                 value={input}
                 onChange={handleInputChange}
