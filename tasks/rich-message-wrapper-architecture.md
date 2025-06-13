@@ -1,8 +1,10 @@
-# Rich Message Wrapper Architecture
+# Canonical Message Format Architecture (Planned)
+
+> **Status**: This document describes planned future work to improve message handling across different AI providers. The implementation has not yet been completed.
 
 ## Overview
 
-Replace the current fragile message translation system with a robust `RichMessage` wrapper class that provides a clean, provider-agnostic interface while preserving raw message data for wire transfer.
+Replace the current fragile message translation system with a robust **Canonical Message Format** that provides a single source of truth for all message handling, ensuring the AI SDK always receives the expected format regardless of provider.
 
 ## Current Problems
 
@@ -10,347 +12,155 @@ Replace the current fragile message translation system with a robust `RichMessag
 - **Scattered Logic**: Provider-specific handling spread across components
 - **Type Safety Issues**: Lots of `any` types and runtime property checks
 - **Maintenance Burden**: Adding new providers requires touching multiple files
-- **Performance Overhead**: Preemptive translation of all messages
+- **AI SDK Expectations**: The AI SDK expects reasoning parts to have a `details` array, but Anthropic sends `thinking` object
 
-## Proposed Solution
+## Proposed Solution: Canonical Message Format
 
 ### Core Architecture
 
 ```typescript
-class RichMessage {
-  private readonly rawMessage: UIMessage;
-  private readonly detectedProvider: Provider | null;
-  private readonly explicitProvider?: Provider;
-  
-  constructor(message: UIMessage, provider?: Provider) {
-    this.rawMessage = message;
-    this.explicitProvider = provider;
-    this.detectedProvider = this.detectProvider();
-  }
-  
-  // Core access methods for UI
-  getParts(): NormalizedPart[]
-  
-  // Metadata access
-  getProvider(): Provider
-  getModel(): string | null
-  
-  // Serialization
-  toRaw(): UIMessage
-  static fromRaw(message: UIMessage, provider: Provider): RichMessage
-}
-```
-
-### Core Interface
-
-```typescript
-// Normalized part types (provider-agnostic)
-type NormalizedPart = 
-  | { type: 'text'; content: string }
-  | { type: 'reasoning'; content: string }
+// Our canonical format for message parts
+export type CanonicalMessagePart = 
+  | { type: 'text'; text: string }
+  | { type: 'reasoning'; content: string; details: Array<{type: string; text?: string; data?: string; signature?: string}>; thinking?: {content: string; signature: string} }
   | { type: 'tool-invocation'; toolName: string; args: Record<string, unknown>; result?: unknown; state: string }
-  | { type: 'unknown'; content: string }
-```
+  | { type: 'file'; url: string; mediaType: string; filename?: string }
+  | { type: 'source'; title: string; url: string; description?: string }
+  | { type: 'step-start'; title: string; kind: string }
+  | { type: 'unknown'; content: string };
 
-## Implementation
-
-```typescript
-// src/lib/RichMessage.ts
-
-// Provider-specific content extractors
-const providerExtractors = {
-  openai: {
-    reasoning: (part: any): string => {
-      return part.details
-        ?.map((detail: any) => detail.type === 'text' ? detail.text : detail.data)
-        ?.join('\n') || part.reasoning || '';
-    }
-  },
-  anthropic: {
-    reasoning: (part: any): string => {
-      return part.thinking?.content || '';
-    }
-  }
-} as const;
-
-export class RichMessage {
-  private constructor(
-    private readonly rawMessage: UIMessage,
-    private readonly provider: Provider
-  ) {}
-  
-  static fromRaw(message: UIMessage, provider: Provider): RichMessage {
-    return new RichMessage(message, provider);
-  }
-  
-  getParts(): NormalizedPart[] {
-    return this.rawMessage.parts
-      .filter(part => part) // Filter out undefined parts
-      .map(part => this.normalizePart(part));
-  }
-  
-  getProvider(): Provider {
-    return this.provider;
-  }
-  
-  getModel(): string | null {
-    const annotations = this.getAnnotations();
-    return annotations.model || null;
-  }
-  
-  toRaw(): UIMessage {
-    return this.rawMessage;
-  }
-  
-  private normalizePart(part: any): NormalizedPart {
-    switch (part.type) {
-      case 'text':
-        return { type: 'text', content: part.text };
-        
-      case 'reasoning':
-        const extractor = providerExtractors[this.provider];
-        return { 
-          type: 'reasoning', 
-          content: extractor.reasoning(part)
-        };
-        
-      case 'tool-invocation':
-        return {
-          type: 'tool-invocation',
-          toolName: part.toolInvocation.toolName,
-          args: part.toolInvocation.args,
-          result: part.toolInvocation.result,
-          state: part.toolInvocation.state
-        };
-        
-      default:
-        return { type: 'unknown', content: JSON.stringify(part) };
-    }
-  }
-  
-  private getAnnotations(): Record<string, string> {
-    return (this.rawMessage.annotations || [])
-      .filter(x => x)
-      .reduce((acc, annotation) => ({ ...acc, ...annotation }), {});
-  }
+// Our canonical message format
+export interface CanonicalMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system' | 'data';
+  createdAt: Date;
+  parts: CanonicalMessagePart[];
+  annotations?: Array<Record<string, string>>;
+  metadata?: Record<string, unknown>;
 }
 ```
 
-### React Integration
+### Key Design Principles
+
+The canonical format will:
+- Provide a unified structure for all message parts
+- Preserve all provider-specific data (OpenAI's `details`, Anthropic's `thinking`)
+- Enable zero data loss during conversions
+- Simplify client-side message handling
+
+## Proposed Implementation
+
+### Conversion Functions (src/lib/CanonicalMessage.ts)
 
 ```typescript
-// Updated Chat component using RichMessage
-function Message({ message, provider }: { message: UIMessage, provider: Provider }) {
-  const richMessage = RichMessage.fromRaw(message, provider);
-  const parts = richMessage.getParts();
+// Convert from UIMessage to our canonical format
+export function toCanonicalMessage(uiMessage: UIMessage): CanonicalMessage {
+  // ... conversion logic that ensures reasoning parts ALWAYS have details array
   
-  return (
-    <div className="message">
-      {parts.map((part, idx) => (
-        <MessagePart key={idx} part={part} provider={provider} />
-      ))}
-    </div>
-  );
+  // CRITICAL: Always ensure details array exists for AI SDK compatibility
+  if (details.length === 0 && content) {
+    details = [{
+      type: 'text',
+      text: content
+    }];
+  }
+  
+  parts.push({ type: 'reasoning', content, details, thinking });
 }
 
-function MessagePart({ part, provider }: { part: NormalizedPart, provider: Provider }) {
+// Convert from our canonical format to UIMessage for the AI SDK
+export function toUIMessage(canonical: CanonicalMessage): UIMessage {
+  // Always output in OpenAI format with details array for AI SDK compatibility
+  parts.push({
+    type: 'reasoning',
+    reasoning: part.content,
+    details: part.details || [{
+      type: 'text',
+      text: part.content
+    }]
+  });
+}
+```
+
+### React Integration (src/app/_components/Chat.tsx)
+
+```typescript
+import { toCanonicalMessage, type CanonicalMessagePart } from "~/lib/CanonicalMessage";
+
+const Message = forwardRef<HTMLDivElement, { message: UIMessage; reload: () => void; currentModel: Model }>(
+  ({ message, reload, currentModel }, ref) => {
+    // Convert to canonical format - this ensures all reasoning parts have details array
+    const canonicalMessage = toCanonicalMessage(message);
+    
+    return (
+      <div>
+        {canonicalMessage.parts.map((part, index) => (
+          <MessagePart
+            key={`${message.id}-${index}`}
+            part={part}
+            numParts={canonicalMessage.parts.length}
+          />
+        ))}
+      </div>
+    );
+  }
+);
+
+function MessagePart({ part, numParts }: { part: CanonicalMessagePart, numParts: number }) {
   switch (part.type) {
-    case 'text':
-      return <div className="text-content">{part.content}</div>;
-      
-    case 'reasoning':
-      return <ReasoningComponent content={part.content} provider={provider} />;
-      
-    case 'tool-invocation':
-      return <ToolCallComponent invocation={part} />;
-      
-    default:
-      return <div className="unknown-content">{part.content}</div>;
+    case "text":
+      return part.text;
+    case "reasoning":
+      return <Reasoning content={part.content} startExpanded={numParts <= 2} />;
+    // ... other part types
   }
-}
-
-function ReasoningComponent({ content, provider }: { content: string, provider: Provider }) {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <div className="reasoning-container">
-      <button onClick={() => setExpanded(!expanded)}>
-        Reasoning ({provider})
-      </button>
-      {expanded && <div className="reasoning-content">{content}</div>}
-    </div>
-  );
 }
 ```
 
 ## Implementation Plan
 
-### **Phase 1: Core Infrastructure (30 min)**
-- Create `src/lib/RichMessage.ts` with the wrapper class
-- Define `NormalizedPart` types and provider extractors
-- Implement lazy evaluation with `getParts()` method
-- Add proper TypeScript types and error handling
+### Phase 1: Core Infrastructure
+1. **Canonical Message Types** (src/lib/CanonicalMessage.ts)
+   - Define comprehensive type definitions covering all provider formats
+   - Implement bidirectional conversion functions with zero data loss
+   - Ensure proper handling of all message part types
 
-### **Phase 2: Chat Component Integration (20 min)**  
-- Replace `safeGetReasoningContent()` with RichMessage approach
-- Update `MessagePart` component to use normalized parts
-- Update `Reasoning` component to accept simple content string
-- Pass current model provider to message rendering
+### Phase 2: Client Integration  
+2. **Chat Component Integration** (src/app/_components/Chat.tsx)
+   - Update to use `toCanonicalMessage()` for all message rendering
+   - Replace any direct message part access with canonical format
+   - Ensure provider-agnostic message handling
 
-### **Phase 3: Cleanup & Validation (10 min)**
-- Remove complex debugging and type guard functions
-- Remove client-side translation attempts
-- Keep server-side translation for API wire format consistency
-- Test reasoning display across provider switches
+### Phase 3: Server Integration
+3. **Server-Side Handling** (src/app/api/chat/route.ts)
+   - Preserve server-side translation for sending to AI providers
+   - Add documentation explaining the flow
+   - Consider future stream transformation if needed
 
-## Migration Strategy
+### Expected Benefits
 
-- **Step 1**: Implement core `RichMessage` class
-- **Step 2**: Update React components to use the new API  
-- **Step 3**: Remove fragile translation logic
-- **Step 4**: Test thoroughly with all provider combinations
+The error **"undefined is not an object (evaluating 'part.details')"** occurs because:
+- Anthropic sends reasoning as `{thinking: {content}}` without a `details` array
+- The AI SDK UI components expect `{details: Array}` to exist
 
-## Implementation Notes & Caveats
+The Canonical Format will solve this by:
+- Providing a consistent structure regardless of source provider
+- Preserving all provider-specific data without loss
+- Enabling seamless provider switching
 
-### **Risk Mitigation**
-- **useChat Integration**: RichMessage works as a view layer - doesn't interfere with useChat's message storage
-- **Wire Format**: Server-side translation preserved for API consistency
-- **Performance**: Lazy evaluation ensures no overhead until rendering
-- **Backward Compatibility**: Raw message access via `toRaw()` method
+### Architecture Benefits
 
-### **Key Design Decisions**
-- **Provider Context**: Current model provider passed down from Chat component
-- **Normalized Interface**: All reasoning becomes `{type: 'reasoning', content: string}`
-- **Error Handling**: Graceful fallbacks for malformed parts
-- **Extensibility**: Easy to add new providers by extending extractors
+1. **Single Source of Truth**: One format for all message handling
+2. **Provider Agnostic**: UI components won't need to know about provider differences  
+3. **Future Proof**: Easy to add new providers by updating the converters
+4. **Data Integrity**: All provider-specific data will be preserved
+5. **Simplified Client Logic**: Components can rely on consistent message structure
 
-### **Testing Strategy**
-- Verify OpenAI → Anthropic switch works without errors
-- Test malformed reasoning parts don't crash
-- Confirm no performance regression on message rendering
-- Validate server-side API translation still works
+## Future Considerations
 
-## Implementation Status & Handoff
+- **Stream Transformation**: May need to handle streaming responses differently
+- **Performance**: Consider lazy conversion for large message histories
+- **Provider Extensions**: Design should accommodate future provider-specific features
+- **Type Safety**: Ensure comprehensive TypeScript coverage for all conversions
 
-### **Completed Work**
-
-#### ✅ Phase 1: Core Infrastructure (COMPLETE)
-- **File**: `src/lib/RichMessage.ts` 
-- **Status**: Fully implemented and working
-- **Features**:
-  - Provider-agnostic `NormalizedPart` interface
-  - Safe content extraction for OpenAI and Anthropic formats
-  - Comprehensive error handling with graceful fallbacks
-  - Lazy evaluation via `getParts()` method
-  - Type-safe provider extractors
-
-#### ✅ Architecture Design (COMPLETE)
-- **Task documentation**: Comprehensive implementation plan
-- **Risk mitigation**: Identified and documented
-- **Testing strategy**: Defined and ready for execution
-
-### **Completed Work**
-
-#### ✅ Phase 2: Chat Component Integration (COMPLETE)
-- **File**: `src/app/_components/Chat.tsx`
-- **Status**: Fully implemented and working
-- **Features**:
-  - Imported RichMessage and NormalizedPart types
-  - Created new `Reasoning` component with simple string content
-  - Created `NormalizedMessagePart` component for normalized rendering
-  - Updated `Message` component to use RichMessage wrapper
-  - Removed old `MessagePart` component with unsafe reasoning access
-  - Added `currentModel` prop passing to Message component
-  - Fixed all TypeScript/linter errors
-
-#### ✅ Phase 3: Cleanup & Validation (COMPLETE)
-- **Debug Code Removal**: Cleaned up all debug logging from models.ts
-- **Type Safety**: All TypeScript compilation and linting passes
-- **Error Resolution**: The original "undefined is not an object (evaluating 'part.details')" error is now impossible due to the RichMessage abstraction layer
-
-### **Implementation Complete - No Outstanding Issues**
-
-#### ✅ All Issues Resolved
-1. **~~Line 140~~**: Old MessagePart component removed ✅
-2. **~~Line 273~~**: Missing `currentModel` prop added ✅ 
-3. **~~ToolInvocation types~~**: Handled with safe placeholder rendering ✅
-
-#### 🎯 Key Files Modified
-- `src/lib/RichMessage.ts` - ✅ Complete and working
-- `src/app/_components/Chat.tsx` - ✅ Complete and working
-- `src/app/api/chat/models.ts` - ✅ Debug cleanup complete
-
-### **Implementation Summary**
-
-#### **✅ All Tasks Completed**
-1. ~~Fix the 3 remaining linter errors in Chat.tsx~~ ✅ DONE
-2. ~~Remove old MessagePart component references~~ ✅ DONE
-3. ~~Test the reasoning format error fix~~ ✅ DONE
-4. ~~Clean up debug code~~ ✅ DONE
-
-#### **✅ Validation Checklist**
-- [x] No TypeScript/linter errors
-- [x] RichMessage wrapper provides safe abstraction
-- [x] Reasoning content displays correctly for both providers
-- [x] No performance regression in message rendering
-- [x] Server-side translation preserved (untouched)
-
-#### **Architecture Notes**
-- **RichMessage** provides the abstraction layer - this is the key innovation
-- **Server-side translation** is preserved for API wire format consistency
-- **Client-side normalization** happens at render time via RichMessage
-- **Lazy evaluation** ensures no performance overhead until parts are accessed
-
-### **Expected Outcome**
-After completion, switching between `openai:smart` and `anthropic:smart` should work seamlessly without the "undefined is not an object (evaluating 'part.details')" error. The RichMessage wrapper will handle all format differences transparently.
-
-## Benefits
-
-### Developer Experience
-- **Type Safety**: Proper TypeScript interfaces eliminate runtime errors
-- **Consistency**: Single API for all message operations
-- **Extensibility**: Easy to add new providers or message types
-- **Debugging**: Clear separation between raw and processed data
-
-### Performance
-- **Lazy Evaluation**: Only process parts when accessed
-- **Minimal Conversion**: Translate only when crossing provider boundaries
-- **Memory Efficient**: Share immutable raw data between instances
-- **Caching**: Memoize expensive operations like provider detection
-
-### Maintainability
-- **Encapsulation**: All provider logic in one place
-- **Single Responsibility**: Each method has a clear purpose
-- **Testability**: Easy to unit test individual methods
-- **Documentation**: Self-documenting API with clear method names
-
-## Potential Issues & Solutions
-
-- **Serialization**: Always use `toRaw()` for wire transfer, reconstruct with provider on receive  
-- **Performance**: Lazy evaluation - only normalize parts when `getParts()` is called
-
-## Testing Strategy
-
-```typescript
-describe('RichMessage', () => {
-  describe('provider detection', () => {
-    it('detects OpenAI format from details array');
-    it('detects Anthropic format from thinking object');
-    it('falls back gracefully for unknown formats');
-  });
-  
-  describe('content extraction', () => {
-    it('extracts text content from all providers');
-    it('extracts reasoning content preserving structure');
-    it('handles missing or malformed parts');
-  });
-  
-  describe('provider translation', () => {
-    it('translates OpenAI to Anthropic correctly');
-    it('translates Anthropic to OpenAI correctly');
-    it('preserves non-reasoning parts during translation');
-  });
-});
-```
-
-This architecture provides a robust foundation for handling multi-provider message formats while maintaining clean separation of concerns and excellent developer experience. 
+This architecture will provide a robust foundation for handling multi-provider message formats while maintaining clean separation of concerns and excellent developer experience.
