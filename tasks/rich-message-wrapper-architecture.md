@@ -183,12 +183,52 @@ function ReasoningComponent({ content, provider }: { content: string, provider: 
 }
 ```
 
+## Implementation Plan
+
+### **Phase 1: Core Infrastructure (30 min)**
+- Create `src/lib/RichMessage.ts` with the wrapper class
+- Define `NormalizedPart` types and provider extractors
+- Implement lazy evaluation with `getParts()` method
+- Add proper TypeScript types and error handling
+
+### **Phase 2: Chat Component Integration (20 min)**  
+- Replace `safeGetReasoningContent()` with RichMessage approach
+- Update `MessagePart` component to use normalized parts
+- Update `Reasoning` component to accept simple content string
+- Pass current model provider to message rendering
+
+### **Phase 3: Cleanup & Validation (10 min)**
+- Remove complex debugging and type guard functions
+- Remove client-side translation attempts
+- Keep server-side translation for API wire format consistency
+- Test reasoning display across provider switches
+
 ## Migration Strategy
 
 - **Step 1**: Implement core `RichMessage` class
-- **Step 2**: Update React components to use the new API
+- **Step 2**: Update React components to use the new API  
 - **Step 3**: Remove fragile translation logic
 - **Step 4**: Test thoroughly with all provider combinations
+
+## Implementation Notes & Caveats
+
+### **Risk Mitigation**
+- **useChat Integration**: RichMessage works as a view layer - doesn't interfere with useChat's message storage
+- **Wire Format**: Server-side translation preserved for API consistency
+- **Performance**: Lazy evaluation ensures no overhead until rendering
+- **Backward Compatibility**: Raw message access via `toRaw()` method
+
+### **Key Design Decisions**
+- **Provider Context**: Current model provider passed down from Chat component
+- **Normalized Interface**: All reasoning becomes `{type: 'reasoning', content: string}`
+- **Error Handling**: Graceful fallbacks for malformed parts
+- **Extensibility**: Easy to add new providers by extending extractors
+
+### **Testing Strategy**
+- Verify OpenAI → Anthropic switch works without errors
+- Test malformed reasoning parts don't crash
+- Confirm no performance regression on message rendering
+- Validate server-side API translation still works
 
 ## Benefits
 
